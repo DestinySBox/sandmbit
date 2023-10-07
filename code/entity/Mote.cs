@@ -14,6 +14,8 @@ namespace Sandbox.entity
 	{
 		[BindComponent] public SelfDestruct SelfDestruct { get; }
 
+		private Particles MoteBeam;
+
 		public override void Spawn()
 		{
 			Model = Cloud.Model( "destiny.gambit_mote" );
@@ -36,7 +38,13 @@ namespace Sandbox.entity
 			moteGlow.Parent = this;
 			moteGlow.Brightness = 0.1f;
 			moteGlow.Range = 128f;
-			moteGlow.Color = GameConfig.RainbowMotes ? new ColorHsv(Random.Shared.NextSingle() * 360, 1, 1).ToColor() : Color.White;
+			var col = GameConfig.RainbowMotes ? new ColorHsv( Random.Shared.NextSingle() * 360, 1, 1 ).ToColor() : Color.White;
+			moteGlow.Color = col;
+			
+			// cant parent to self because the beam should face up not sideways
+			MoteBeam = Particles.Create( "particles/mote_beam.vpcf" );
+			Vector3 rgb = new( col.r, col.g, col.b );
+			MoteBeam.Set( "BeamColor", rgb );
 		}
 
 		[Sandbox.GameEvent.PreRender]
@@ -50,6 +58,24 @@ namespace Sandbox.entity
 			{
 				EnableDrawing = true;
 			}
+		}
+
+		// have to override delete because self destruct doesnt catch the beam
+		public new virtual void Delete()
+		{
+			MoteBeam.Destroy();
+			base.Delete();
+		}
+
+		[GameEvent.Tick.Server]
+		private void UpdateBeam()
+		{
+			if ( SelfDestruct.Lifetime.Relative <= 5 ) {
+				MoteBeam.EnableDrawing = (SelfDestruct.Lifetime.Relative % 0.25) > 0.125;
+			}
+			var beamPos = Position + new Vector3( 0, 0, 30 );
+			MoteBeam.SetPosition( 0, beamPos );
+			MoteBeam.SetOrientation( 0, new Angles( 90, 0, 0 ) );
 		}
 	}
 }
